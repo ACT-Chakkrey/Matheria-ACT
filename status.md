@@ -65,6 +65,7 @@
 - [x] **QA-DB5**: Global leaderboard calculates correct ranks from SQLite in < 5ms. (Passed)
 - [x] **QA-DB6**: Friends system updates SQLite tables accurately. (Passed)
 - [x] **QA-DB7**: Direct messages persist in SQLite and display real-time unread counts. (Passed)
+- [x] **QA-DB8**: Vercel Serverless writeable storage resolved: `/tmp/data` SQLite engine with journal fallback. (Passed & verified live on `https://matheria-v2.vercel.app`)
 
 ### 4.2 Multiplayer Tests
 - [x] **QA-MP1**: Room host creates room and receives 4-letter code. (Passed)
