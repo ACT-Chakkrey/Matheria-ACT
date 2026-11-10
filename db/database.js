@@ -17,11 +17,19 @@ class MatheriaDB {
   }
 
   init() {
-    this.db.exec(`
-      PRAGMA journal_mode = WAL;
-      PRAGMA synchronous = NORMAL;
-      PRAGMA foreign_keys = ON;
+    try {
+      this.db.exec(`
+        PRAGMA journal_mode = WAL;
+        PRAGMA synchronous = NORMAL;
+        PRAGMA foreign_keys = ON;
+      `);
+    } catch (e) {
+      try {
+        this.db.exec(`PRAGMA journal_mode = DELETE;`);
+      } catch (err) {}
+    }
 
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         username TEXT PRIMARY KEY COLLATE NOCASE,
         name TEXT NOT NULL,

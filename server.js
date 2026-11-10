@@ -7,13 +7,27 @@ const crypto = require('crypto');
 const MatheriaDB = require('./db/database');
 
 const PORT = process.env.PORT || 3000;
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const IS_VERCEL = !!(process.env.VERCEL || process.env.NOW_REGION);
+const BUNDLED_DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.DATA_DIR || (IS_VERCEL ? '/tmp/data' : BUNDLED_DATA_DIR);
 const DB_FILE = path.join(DATA_DIR, 'matheria.db');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const SECRET_FILE = path.join(DATA_DIR, 'secret.txt');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
-fs.mkdirSync(DATA_DIR, { recursive: true });
+try {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+} catch (e) {}
+
+// On Vercel, copy bundled seed files to writeable /tmp/data if not already present
+if (IS_VERCEL) {
+  try {
+    const bundledUsers = path.join(BUNDLED_DATA_DIR, 'users.json');
+    if (!fs.existsSync(USERS_FILE) && fs.existsSync(bundledUsers)) {
+      fs.copyFileSync(bundledUsers, USERS_FILE);
+    }
+  } catch (e) {}
+}
 
 // Initialize SQLite Database
 const db = new MatheriaDB(DB_FILE);
@@ -28,12 +42,14 @@ if (fs.existsSync(USERS_FILE)) {
 }
 
 // Secret for HMAC tokens
-let SECRET;
-try {
-  SECRET = fs.readFileSync(SECRET_FILE, 'utf8');
-} catch (e) {
-  SECRET = crypto.randomBytes(32).toString('hex');
-  fs.writeFileSync(SECRET_FILE, SECRET);
+let SECRET = process.env.SECRET;
+if (!SECRET) {
+  try {
+    SECRET = fs.readFileSync(SECRET_FILE, 'utf8');
+  } catch (e) {
+    SECRET = crypto.randomBytes(32).toString('hex');
+    try { fs.writeFileSync(SECRET_FILE, SECRET); } catch (err) {}
+  }
 }
 
 // ---------- auth helpers ----------
@@ -76,6 +92,12 @@ const MIME = {
 };
 
 function readBody(req, limit = 200000) {
+  if (req.body && typeof req.body === 'object') {
+    return Promise.resolve(req.body);
+  }
+  if (typeof req.body === 'string') {
+    try { return Promise.resolve(JSON.parse(req.body)); } catch (e) {}
+  }
   return new Promise((resolve, reject) => {
     let data = '';
     req.on('data', c => {
@@ -92,12 +114,19 @@ function readBody(req, limit = 200000) {
         reject(e);
       }
     });
+    req.on('error', reject);
   });
 }
 
 function send(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(obj));
+}
+
+function getClientIp(req) {
+  const fwd = req.headers && (req.headers['x-forwarded-for'] || req.headers['x-real-ip']);
+  if (fwd) return String(fwd).split(',')[0].trim();
+  return (req.socket && req.socket.remoteAddress) || '127.0.0.1';
 }
 
 // ---------- online status tracker ----------
@@ -152,7 +181,7 @@ const server = http.createServer(async (req, res) => {
   try {
     // ---------- AUTH: REGISTER ----------
     if (url.pathname === '/api/register' && req.method === 'POST') {
-      if (limited(req.socket.remoteAddress)) return send(res, 429, { error: 'Too many attempts, please wait a minute.' });
+      if (limited(getClientIp(req))) return send(res, 429, { error: 'Too many attempts, please wait a minute.' });
       const { username, password } = await readBody(req);
       if (!NAME_RE.test(username || '')) return send(res, 400, { error: 'Name must be 3-16 letters, numbers, or _' });
       if (typeof password !== 'string' || password.length < 4) return send(res, 400, { error: 'Password must be at least 4 characters' });
@@ -179,7 +208,7 @@ const server = http.createServer(async (req, res) => {
 
     // ---------- AUTH: LOGIN ----------
     if (url.pathname === '/api/login' && req.method === 'POST') {
-      if (limited(req.socket.remoteAddress)) return send(res, 429, { error: 'Too many attempts, please wait a minute.' });
+      if (limited(getClientIp(req))) return send(res, 429, { error: 'Too many attempts, please wait a minute.' });
       const { username, password } = await readBody(req);
       const u = db.getUser(String(username || '').toLowerCase());
       if (!u || typeof password !== 'string') return send(res, 401, { error: 'Wrong name or password' });
@@ -453,7 +482,7 @@ const server = http.createServer(async (req, res) => {
     });
   } catch (e) {
     console.error('Server error:', e);
-    send(res, 500, { error: 'Internal server error' });
+    send(res, 500, { error: e.message || 'Internal server error' });
   }
 });
 
@@ -997,11 +1026,16 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// Start the server
-server.listen(PORT, () => {
-  console.log(`===============================================`);
-  console.log(`🎮 Matheria MVP Server running on http://localhost:${PORT}`);
-  console.log(`💾 SQLite Database connected: ${DB_FILE}`);
-  console.log(`⚡ WebSocket Multiplayer active on /ws`);
-  console.log(`===============================================`);
-});
+// Export server for serverless runtimes (Vercel)
+module.exports = server;
+
+// Start the server if running directly
+if (!IS_VERCEL) {
+  server.listen(PORT, () => {
+    console.log(`===============================================`);
+    console.log(`🎮 Matheria MVP Server running on http://localhost:${PORT}`);
+    console.log(`💾 SQLite Database connected: ${DB_FILE}`);
+    console.log(`⚡ WebSocket Multiplayer active on /ws`);
+    console.log(`===============================================`);
+  });
+}
