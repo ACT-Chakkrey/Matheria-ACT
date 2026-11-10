@@ -1,0 +1,270 @@
+/* =========================================================
+   Matheria.V2 - Universal Responsive & Mobile UI/UX Engine
+   Optimized for Mobile (Portrait/Landscape), Tablets, and Desktop
+   ========================================================= */
+
+:root {
+  --vh: 100vh;
+}
+
+/* Base Viewport Fixes */
+html, body {
+  min-height: 100%;
+  min-height: 100dvh;
+  touch-action: manipulation;
+  -webkit-overflow-scrolling: touch;
+}
+
+section {
+  min-height: 100dvh;
+  box-sizing: border-box;
+}
+
+/* Touch targets and buttons */
+button, .menu-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Floating Status / Battle Info Banner */
+#battleInfo {
+  max-width: 94vw;
+  box-sizing: border-box;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Mobile Virtual Keypad for Math Answering */
+.mobile-keypad {
+  display: none;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  max-width: 280px;
+  margin: 10px auto 15px auto;
+  user-select: none;
+}
+
+.keypad-btn {
+  background: #111;
+  color: #fff;
+  border: 2px solid gold;
+  border-radius: 4px;
+  padding: 12px 0;
+  font-size: 16px;
+  font-family: 'Press Start 2P', monospace, sans-serif !important;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 3px 0 #000;
+  transition: transform 0.05s, background 0.1s;
+}
+
+.keypad-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #000;
+  background: #333;
+}
+
+.keypad-btn.action-del {
+  border-color: #ff4444;
+  color: #ff4444;
+}
+
+.keypad-btn.action-enter {
+  border-color: #00ff00;
+  color: #00ff00;
+}
+
+/* ---------------------------------------------------------
+   TABLET & SMALL DESKTOP (Width <= 768px)
+   --------------------------------------------------------- */
+@media (max-width: 768px) {
+  body {
+    font-size: 10px;
+  }
+
+  section {
+    padding: 10px;
+  }
+
+  .battle-stage {
+    height: 260px;
+    margin-top: 20px;
+  }
+
+  #enemyImg {
+    width: 160px;
+    height: 160px;
+  }
+
+  #heroWrapper {
+    width: 65px;
+    height: 65px;
+  }
+
+  .bar-container {
+    width: 150px;
+  }
+
+  #battleInfo {
+    font-size: 8px;
+    padding: 6px 10px;
+    white-space: normal;
+  }
+
+  /* Co-op stage adjustments */
+  .coop-stage {
+    min-height: 220px;
+  }
+
+  #coopBossImg {
+    width: 140px;
+    height: 140px;
+  }
+
+  /* Dialogue Box */
+  #dialogueBox {
+    width: 90% !important;
+    left: 5% !important;
+    bottom: 10px !important;
+    font-size: 9px !important;
+  }
+
+  /* Show virtual keypad on touch screens */
+  .mobile-keypad {
+    display: grid;
+  }
+}
+
+/* ---------------------------------------------------------
+   MOBILE PHONES (Width <= 480px)
+   --------------------------------------------------------- */
+@media (max-width: 480px) {
+  input[type="text"], input[type="password"] {
+    width: 85% !important;
+    max-width: 260px;
+    font-size: 12px;
+  }
+
+  input#answer, input#coopAnswer {
+    width: 120px !important;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .battle-stage {
+    height: 220px;
+    margin-top: 15px;
+  }
+
+  #enemyImg {
+    width: 125px;
+    height: 125px;
+    margin-bottom: 0;
+  }
+
+  #heroWrapper {
+    width: 55px;
+    height: 55px;
+  }
+
+  .bar-container {
+    width: 120px;
+  }
+
+  .hp-text {
+    font-size: 7px;
+  }
+
+  #battleInfo {
+    top: 6px;
+    font-size: 7px;
+    padding: 4px 8px;
+    border-width: 2px;
+    line-height: 1.4;
+  }
+
+  .menu-btn {
+    font-size: 8px;
+    padding: 8px 12px;
+    margin: 4px;
+  }
+
+  /* Timing bar responsive width */
+  #attackBarContainer, #coopAtkBar {
+    width: 90% !important;
+    max-width: 320px;
+  }
+
+  /* Co-op log responsive height */
+  #coopLog {
+    height: 70px !important;
+    font-size: 7px !important;
+  }
+
+  /* Modal cards */
+  div[style*="max-width: 520px"],
+  div[style*="max-width: 560px"],
+  div[style*="max-width: 640px"],
+  div[style*="max-width: 760px"] {
+    width: 95% !important;
+    padding: 10px !important;
+  }
+
+  /* Pearl Dodge Button */
+  .pearl-btn {
+    width: 70px !important;
+    height: 70px !important;
+    font-size: 24px !important;
+  }
+}
+
+/* ---------------------------------------------------------
+   LANDSCAPE ORIENTATION ON PHONES (Height <= 500px)
+   --------------------------------------------------------- */
+@media (max-height: 500px) and (orientation: landscape) {
+  section {
+    padding: 6px 12px;
+  }
+
+  .battle-stage {
+    height: 160px;
+    margin-top: 5px;
+  }
+
+  #enemyImg {
+    width: 100px;
+    height: 100px;
+  }
+
+  #heroWrapper {
+    width: 45px;
+    height: 45px;
+  }
+
+  #battleInfo {
+    position: static !important;
+    transform: none !important;
+    margin: 2px auto !important;
+    font-size: 7px;
+    padding: 2px 6px;
+  }
+
+  #timerContainer {
+    font-size: 9px;
+    margin: 4px 0;
+  }
+
+  #inputZone {
+    margin: 4px 0;
+  }
+
+  #question {
+    font-size: 16px;
+    margin: 2px 0;
+  }
+
+  .mobile-keypad {
+    display: none; /* Keep compact on landscape to avoid vertical scroll */
+  }
+}

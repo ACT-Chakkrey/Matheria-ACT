@@ -1,0 +1,24 @@
+{
+  "name": "matheria",
+  "version": "2.0.0",
+  "description": "Matheria: Number Heroes – Boss Rush Edition. Lightweight Real-Time Multiplayer Math RPG.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "migrate": "node db/migrate.js",
+    "test": "node test/test-db.js"
+  },
+  "keywords": [
+    "math-rpg",
+    "multiplayer",
+    "co-op",
+    "sqlite",
+    "educational-game"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "author": "Matheria Team",
+  "license": "MIT"
+}
