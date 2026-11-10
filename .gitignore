@@ -2,3 +2,4 @@ data/matheria.db*
 data/*.bak
 node_modules/
 .DS_Store
+.vercel
