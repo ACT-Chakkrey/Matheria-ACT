@@ -227,7 +227,7 @@ const server = http.createServer(async (req, res) => {
 
       if (req.method === 'GET') return send(res, 200, { save: u.save });
 
-      if (req.method === 'PUT') {
+      if (req.method === 'PUT' || req.method === 'POST') {
         const { save } = await readBody(req);
         if (!save || typeof save !== 'object') return send(res, 400, { error: 'Bad save format' });
 
