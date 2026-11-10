@@ -66,6 +66,10 @@
 - [x] **QA-DB6**: Friends system updates SQLite tables accurately. (Passed)
 - [x] **QA-DB7**: Direct messages persist in SQLite and display real-time unread counts. (Passed)
 - [x] **QA-DB8**: Vercel Serverless writeable storage resolved: `/tmp/data` SQLite engine with journal fallback. (Passed & verified live on `https://matheria-v2.vercel.app`)
+- [x] **QA-DB9**: Front-page landing authentication unified with backend SQLite `/api/register` & `/api/login` (Passed: eliminated local-storage-only isolation).
+- [x] **QA-DB10**: Cross-device account persistence & cloud save sync verified live on Vercel production. (Passed: saved coins/levels immediately restored on secondary device).
+- [x] **QA-SOC1**: Friends system verified end-to-end on Vercel (Passed: request, accept, roster query).
+- [x] **QA-SOC2**: Direct messaging / chat between friends verified end-to-end on Vercel (Passed: sending, receiving, unread count).
 
 ### 4.2 Multiplayer Tests
 - [x] **QA-MP1**: Room host creates room and receives 4-letter code. (Passed)
