@@ -3037,31 +3037,125 @@ async function attemptLogin(){
     const u = document.getElementById('usernameInput').value.trim();
     const pw = document.getElementById('passwordInput').value;
     if(!u || !pw){ alert('ENTER YOUR NAME AND PASSWORD!'); return; }
-    const name = findLocalName(u);
-    if(!name){ alert('NO ACCOUNT WITH THAT NAME.\nPRESS CREATE ACCOUNT FIRST.'); return; }
-    let sv = null; try { sv = JSON.parse(localStorage.getItem('save_rpg_' + name)); } catch(e) {}
-    if(!document.getElementById('gradeSelect').value && !(sv && sv.grade)){ alert('PLEASE CHOOSE YOUR GRADE!'); return; }
-    const acct = getAcct(name);
-    if(!acct){
-        if(!confirm('This is an older account without a password.\nUse the password you typed as its password from now on?')) return;
-        await makeAcct(name, pw);
-    } else if(await hashLocal(name, pw, acct.salt) !== acct.hash){
-        playSfx('wrongSound'); alert('WRONG PASSWORD!'); return;
+
+    const loginBtn = document.querySelector('#auth button[onclick="attemptLogin()"]');
+    const oldText = loginBtn ? loginBtn.textContent : 'LOGIN';
+    if(loginBtn) loginBtn.textContent = 'LOGGING IN...';
+
+    try {
+        // 1. Server login (cross-device database authentication)
+        const res = await olApi('/api/login', 'POST', { username: u, password: pw });
+        onlineToken = res.token;
+        onlineName = res.username || u;
+        currentUser = onlineName;
+        localStorage.setItem('nh_token', onlineToken);
+        localStorage.setItem('nh_name', onlineName);
+
+        // Save account locally for offline fallback
+        await makeAcct(onlineName, pw);
+
+        // 2. Restore cloud save from database if it exists
+        if (res.save && typeof res.save === 'object') {
+            olApplySave(res.save);
+        } else {
+            loadGame(onlineName);
+        }
+
+        // Apply selected grade if provided
+        const gVal = document.getElementById('gradeSelect').value;
+        if (gVal) {
+            grade = parseInt(gVal);
+            age = gradeToAge(grade);
+            saveGame();
+        }
+
+        finishLogin(onlineName);
+        if (typeof notifPoll === 'function') setTimeout(notifPoll, 100);
+        if (typeof updateStatusTags === 'function') updateStatusTags();
+    } catch (e) {
+        if(loginBtn) loginBtn.textContent = oldText;
+        playSfx('wrongSound');
+
+        // Check if server rejected credentials
+        if (e.message && (e.message.includes('Wrong') || e.message.includes('password') || e.message.includes('401'))) {
+            alert('WRONG NAME OR PASSWORD!\nIf this is a new account, please click CREATE ACCOUNT.');
+            return;
+        }
+
+        // Offline fallback if server is unreachable
+        const name = findLocalName(u);
+        if (name) {
+            const acct = getAcct(name);
+            if (acct && (await hashLocal(name, pw, acct.salt)) === acct.hash) {
+                finishLogin(name);
+                return;
+            }
+        }
+        alert('LOGIN FAILED: ' + (e.message || 'Cannot reach server'));
     }
-    finishLogin(name);
 }
+
 async function attemptRegister(){
     const u = document.getElementById('usernameInput').value.trim();
     const pw = document.getElementById('passwordInput').value;
     if(!/^[A-Za-z0-9_]{3,16}$/.test(u)){ alert('Name must be 3-16 letters, numbers or _'); return; }
     if(pw.length < 4){ alert('Password must be at least 4 characters'); return; }
-    if(!document.getElementById('gradeSelect').value){ alert('PLEASE CHOOSE YOUR GRADE!'); return; }
-    if(findLocalName(u)){ playSfx('wrongSound'); alert('THAT NAME IS ALREADY TAKEN.\nChoose another name, or press LOGIN if it is yours.'); return; }
-    await makeAcct(u, pw);
-    finishLogin(u);
+    const gVal = document.getElementById('gradeSelect').value;
+    if(!gVal){ alert('PLEASE CHOOSE YOUR GRADE!'); return; }
+
+    const regBtn = document.querySelector('#auth button[onclick="attemptRegister()"]');
+    const oldText = regBtn ? regBtn.textContent : 'CREATE ACCOUNT';
+    if(regBtn) regBtn.textContent = 'CREATING...';
+
+    try {
+        // 1. Register on online server (SQLite database)
+        const res = await olApi('/api/register', 'POST', { username: u, password: pw });
+        onlineToken = res.token;
+        onlineName = res.username || u;
+        currentUser = onlineName;
+        localStorage.setItem('nh_token', onlineToken);
+        localStorage.setItem('nh_name', onlineName);
+
+        // 2. Also save account locally for offline fallback
+        await makeAcct(u, pw);
+
+        // 3. Set grade and initialize save
+        grade = parseInt(gVal) || 3;
+        age = gradeToAge(grade);
+
+        // 4. Save and auto-sync initial state to cloud
+        saveGame();
+        if (typeof olSaveNow === 'function') {
+            await olSaveNow().catch(() => {});
+        }
+
+        // 5. Complete login
+        finishLogin(onlineName);
+        if (typeof notifPoll === 'function') setTimeout(notifPoll, 100);
+        if (typeof updateStatusTags === 'function') updateStatusTags();
+    } catch (e) {
+        if(regBtn) regBtn.textContent = oldText;
+        playSfx('wrongSound');
+        const errMsg = e.message || 'Cannot connect to server';
+        if (errMsg.includes('taken') || errMsg.includes('already taken')) {
+            alert('THAT NAME IS ALREADY TAKEN.\nChoose another name, or press LOGIN if it is yours.');
+        } else {
+            alert('REGISTRATION FAILED: ' + errMsg);
+        }
+    }
 }
+
 function sameOnlinePlayer(){ return !!(onlineName && currentUser && onlineName.toLowerCase() === currentUser.toLowerCase()); }
-function logout() { saveGame(); setTimeout(() => { location.reload(); }, 500); }
+function logout() {
+    saveGame();
+    if (typeof coopLeave === 'function') coopLeave();
+    onlineToken = null;
+    onlineName = null;
+    currentUser = null;
+    localStorage.removeItem('nh_token');
+    localStorage.removeItem('nh_name');
+    setTimeout(() => { location.reload(); }, 200);
+}
 
 
 
@@ -5224,6 +5318,9 @@ let cloudSaveTimer = null;
 function olBase() {
     if (window.ENV_CONFIG && window.ENV_CONFIG.API_BASE) return window.ENV_CONFIG.API_BASE;
     let v = (document.getElementById('olServer') ? document.getElementById('olServer').value : '').trim().replace(/\/+$/, '');
+    if (v && v.includes('localhost') && location.hostname && !location.hostname.includes('localhost') && location.hostname !== '127.0.0.1') {
+        v = '';
+    }
     if (!v) v = (location.protocol.startsWith('http')) ? location.origin : 'http://localhost:3000';
     if (!/^https?:\/\//.test(v)) v = 'http://' + v;
     return v;
@@ -5244,7 +5341,9 @@ async function olApi(path, method, body) {
 function showOnline() {
     showSection('online');
     const saved = localStorage.getItem('nh_server');
-    document.getElementById('olServer').value = saved || (location.protocol.startsWith('http') ? location.origin : 'http://localhost:3000');
+    const isProd = location.protocol.startsWith('http') && !location.hostname.includes('localhost') && location.hostname !== '127.0.0.1';
+    const serverVal = (isProd && saved && saved.includes('localhost')) ? location.origin : (saved || (location.protocol.startsWith('http') ? location.origin : 'http://localhost:3000'));
+    if (document.getElementById('olServer')) document.getElementById('olServer').value = serverVal;
     if (onlineToken && onlineName) olShowMain(); else olShowAuth();
 }
 
@@ -5886,7 +5985,9 @@ let frPoll = null;
 function openFriends(){
     showSection('friends');
     const saved = localStorage.getItem('nh_server');
-    document.getElementById('olServer').value = saved || (location.protocol.startsWith('http') ? location.origin : 'http://localhost:3000');
+    const isProd = location.protocol.startsWith('http') && !location.hostname.includes('localhost') && location.hostname !== '127.0.0.1';
+    const serverVal = (isProd && saved && saved.includes('localhost')) ? location.origin : (saved || (location.protocol.startsWith('http') ? location.origin : 'http://localhost:3000'));
+    if (document.getElementById('olServer')) document.getElementById('olServer').value = serverVal;
     const loggedIn = !!(onlineToken && onlineName);
     document.getElementById('frNeedLogin').style.display = loggedIn ? 'none' : 'block';
     document.getElementById('frMain').style.display = loggedIn ? 'block' : 'none';
@@ -6589,6 +6690,29 @@ function musicPrev(){ if(mpSongs.length) musicPlayIndex((mpIndex - 1 + mpSongs.l
 document.getElementById('mpAudio').addEventListener('ended', musicNext);
 // restore the last choice (nothing autoplays: browsers need a click first)
 musicSetSource(['game', 'spotify', 'youtube', 'files'].includes(lsGet('nh_music_src', 'game')) ? lsGet('nh_music_src', 'game') : 'game', true);
+
+// Auto-restore session if previously authenticated
+(async function initAutoLogin() {
+    const savedToken = localStorage.getItem('nh_token');
+    const savedName = localStorage.getItem('nh_name');
+    if (savedToken && savedName) {
+        try {
+            onlineToken = savedToken;
+            onlineName = savedName;
+            const res = await olApi('/api/save');
+            if (res && res.save && typeof res.save === 'object') {
+                olApplySave(res.save);
+            }
+            finishLogin(savedName);
+            if (typeof notifPoll === 'function') setTimeout(notifPoll, 500);
+        } catch (e) {
+            console.warn('Auto-login session expired or offline:', e.message);
+            if (typeof findLocalName === 'function' && findLocalName(savedName)) {
+                finishLogin(savedName);
+            }
+        }
+    }
+})();
 </script>
 <script src="js/keypad.js"></script>
 </body>
